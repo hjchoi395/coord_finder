@@ -1,0 +1,5 @@
+coord_finder
+cache_state.db
+*.o
+*.exe
+.vscode/
