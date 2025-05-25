@@ -4,7 +4,7 @@ Made for 25-1 PLT
 
 [Initial Verison]
 
--DB and DB structure completed(make larger DB if possible)
+-DB and DB structure completed
 
 -cache algorithm: LRU(needs revision)
 
