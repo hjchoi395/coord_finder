@@ -14,7 +14,6 @@
 #include "db.h"
 
 #define DC_DELAY_MS 100  // data center 왕복 지연 시간 (밀리초)
-#define TTL_SEC     30   // 캐시 TTL (초)
 
 // 현재 시각을 ms 단위로 반환
 static double current_time_ms() {
