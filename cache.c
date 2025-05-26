@@ -40,6 +40,7 @@ static void move_to_head(CacheEntry *e) {
     head = e;
 }
 
+// 캐시 초기화
 void init_cache(void) {
     head = tail = NULL;
     cache_count = 0;
@@ -79,21 +80,22 @@ void cache_insert(const char *key, const char *value) {
         }
         e = e->next;
     }
-    // 신규 엔트리 생성
+    // 신규 엔트리 생성 & 머리 삽입
     CacheEntry *new_e = malloc(sizeof(CacheEntry));
     if (!new_e) return;
-    strncpy(new_e->key, key, sizeof(new_e->key)-1);
+    strncpy(new_e->key,   key,   sizeof(new_e->key)-1);
     new_e->key[sizeof(new_e->key)-1] = '\0';
     strncpy(new_e->value, value, sizeof(new_e->value)-1);
     new_e->value[sizeof(new_e->value)-1] = '\0';
     new_e->timestamp = time(NULL);
-    // 리스트 앞에 연결
+
     new_e->prev = NULL;
     new_e->next = head;
     if (head) head->prev = new_e;
     head = new_e;
     if (!tail) tail = new_e;
     cache_count++;
+
     // 용량 초과 시 LRU 제거
     if (cache_count > MAX_CACHE_SIZE) {
         CacheEntry *old = tail;
@@ -112,7 +114,10 @@ void save_cache(void) {
     // MRU부터 순서대로 저장
     while (e) {
         if ((now - e->timestamp) <= TTL_SEC) {
-            fprintf(fp, "%ld %s %s\n", (long)e->timestamp, e->key, e->value);
+            fprintf(fp, "%ld %s %s\n",
+                    (long)e->timestamp,
+                    e->key,
+                    e->value);
         }
         e = e->next;
     }
@@ -122,20 +127,42 @@ void save_cache(void) {
 void load_cache(void) {
     FILE *fp = fopen(PERSIST_FILE, "r");
     if (!fp) return;
+
+    // 기존 캐시 비우기 (필요시)
+    init_cache();
+
     long ts;
-    char key[64], value[128];
+    char key[sizeof(((CacheEntry*)0)->key)];
+    char value[sizeof(((CacheEntry*)0)->value)];
     time_t now = time(NULL);
+
+    // 파일에 기록된 순서(MRU→…→LRU) 그대로
+    // 매 줄마다 tail에 직접 추가하여 순서 보존
     while (fscanf(fp, "%ld %63s %127[^\n]", &ts, key, value) == 3) {
         if ((now - ts) <= TTL_SEC) {
-            cache_insert(key, value);
-            // 최근 삽입된 head의 timestamp를 파일 기록된 ts로 복원
-            if (head) head->timestamp = (time_t)ts;
+            CacheEntry *new_e = malloc(sizeof(CacheEntry));
+            if (!new_e) continue;
+
+            // 데이터 복사 & 원본 타임스탬프 복원
+            strncpy(new_e->key,   key,   sizeof(new_e->key)-1);
+            new_e->key[sizeof(new_e->key)-1] = '\0';
+            strncpy(new_e->value, value, sizeof(new_e->value)-1);
+            new_e->value[sizeof(new_e->value)-1] = '\0';
+            new_e->timestamp = (time_t)ts;
+
+            // 리스트 끝(tail)에 연결
+            new_e->next = NULL;
+            new_e->prev = tail;
+            if (tail)        tail->next = new_e;
+            else             head = new_e;
+            tail = new_e;
+            cache_count++;
         }
     }
+
     fclose(fp);
     remove(PERSIST_FILE);
 }
-
 
 void print_cache(void) {
     printf("Cache Contents (count=%d):\n", cache_count);
@@ -143,7 +170,9 @@ void print_cache(void) {
     time_t now = time(NULL);
     while (e) {
         printf("  %s -> %s (age=%ld sec)\n",
-               e->key, e->value, (long)(now - e->timestamp));
+               e->key,
+               e->value,
+               (long)(now - e->timestamp));
         e = e->next;
     }
 }
