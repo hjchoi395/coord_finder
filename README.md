@@ -6,6 +6,6 @@ Made for 25-1 PLT
 
 -DB and DB structure completed
 
--cache algorithm: LRU(needs revision)
+-cache algorithm: LRU + TTL
 
 -main: needs to print accurate time
