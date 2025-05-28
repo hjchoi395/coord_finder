@@ -3,10 +3,9 @@
 #include <time.h>
 
 #ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
-  #include <sys/timeb.h>
 #else
-  #include <sys/time.h>
   #include <unistd.h>
 #endif
 
@@ -15,14 +14,22 @@
 
 #define DC_DELAY_MS 100  // data center 왕복 지연 시간 (밀리초)
 
-// 현재 시각을 ms 단위로 반환
+// 고해상도 시간 측정 함수 (밀리초 단위 반환)
 static double current_time_ms() {
 #ifdef _WIN32
-    struct _timeb tb; _ftime(&tb);
-    return tb.time * 1000.0 + tb.millitm;
+    static LARGE_INTEGER freq = {0};
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    // 나노초 단위 계산 후 밀리초로 변환
+    return (double)counter.QuadPart * 1000.0 / (double)freq.QuadPart;
 #else
-    struct timeval tv; gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000.0 + tv.tv_usec / 1000.0;
+    struct timespec ts;
+    // MONOTONIC은 시스템 시간이 변경되어도 계속 증가
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 #endif
 }
 
@@ -41,7 +48,7 @@ int main() {
 
         if (cache_lookup(input, value)) {
             double t1 = current_time_ms();
-            printf("CACHE HIT : %s -> %s (%.2f ms)\n",
+            printf("CACHE HIT : %s -> %s (%.3f ms)\n",
                    input, value, t1 - t0);
         } else {
 #ifdef _WIN32
@@ -52,17 +59,17 @@ int main() {
             if (db_lookup(input, value)) {
                 cache_insert(input, value);
                 double t1 = current_time_ms();
-                printf("CACHE MISS: loaded from DB -> %s (%.2f ms including ~%d ms DC delay)\n",
+                printf("CACHE MISS: loaded from DB -> %s (%.3f ms including ~%d ms DC delay)\n",
                        value, t1 - t0, DC_DELAY_MS);
             } else {
                 double t1 = current_time_ms();
-                printf("NOT FOUND  : %s (%.2f ms)\n",
+                printf("NOT FOUND  : %s (%.3f ms)\n",
                        input, t1 - t0);
             }
         }
     }
 
-    save_cache();   // 종료 시 캐시에 남은 데이터를 파일로 저장
+    save_cache();
     print_cache();
 
     return 0;
