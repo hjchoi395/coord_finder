@@ -8,4 +8,4 @@ Made for 25-1 PLT
 
 -cache algorithm: LRU + TTL
 
--main: needs to print accurate time
+-main: precisde time calculation: nanosecond
