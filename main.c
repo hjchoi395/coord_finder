@@ -12,8 +12,8 @@
 #include "cache.h"
 #include "db.h"
 
-// 고해상도 시간 측정 함수 (마이크로초 단위 반환)
-static double current_time_us() {
+// 고해상도 시간 측정 함수 (나노초 단위 반환)
+static double current_time_ns() {
 #ifdef _WIN32
     static LARGE_INTEGER freq = {0};
     if (freq.QuadPart == 0) {
@@ -21,12 +21,12 @@ static double current_time_us() {
     }
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
-    return (double)counter.QuadPart * 1e6 / (double)freq.QuadPart;
+    // 나노초 단위로 변환
+    return (double)counter.QuadPart * 1e9 / (double)freq.QuadPart;
 #else
     struct timespec ts;
-    // MONOTONIC은 시스템 시간이 변경되어도 계속 증가
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
+    return (double)ts.tv_sec * 1e9 + (double)ts.tv_nsec;
 #endif
 }
 
@@ -41,21 +41,21 @@ int main() {
         if (scanf("%63s", input) != 1) break;
         if (strcmp(input, "exit") == 0) break;
 
-        double t0 = current_time_us();
+        double t0 = current_time_ns();
 
         if (cache_lookup(input, value)) {
-            double t1 = current_time_us();
-            printf("CACHE HIT : %s -> %s (%.3f µs)\n",
+            double t1 = current_time_ns();
+            printf("CACHE HIT : %s -> %s (%.0f ns)\n",
                    input, value, t1 - t0);
         } else {
             if (db_lookup(input, value)) {
                 cache_insert(input, value);
-                double t1 = current_time_us();
-                printf("CACHE MISS: loaded from DB -> %s (%.3f µs)\n",
+                double t1 = current_time_ns();
+                printf("CACHE MISS: loaded from DB -> %s (%.0f ns)\n",
                        value, t1 - t0);
             } else {
-                double t1 = current_time_us();
-                printf("NOT FOUND  : %s (%.3f µs)\n",
+                double t1 = current_time_ns();
+                printf("NOT FOUND  : %s (%.0f ns)\n",
                        input, t1 - t0);
             }
         }
