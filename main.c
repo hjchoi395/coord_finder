@@ -37,9 +37,21 @@ int main() {
     load_cache();  // 이전 실행 시 저장된 캐시 로드
 
     while (1) {
-        printf(">> Enter base name (or 'exit'): ");
+        printf(">> Enter base name (or 'exit', 'log'): ");
         if (scanf("%63s", input) != 1) break;
-        if (strcmp(input, "exit") == 0) break;
+
+        // 종료 명령
+        if (strcmp(input, "exit") == 0) {
+            break;
+        }
+
+        // 캐시 로그 출력 명령
+        if (strcmp(input, "log") == 0) {
+            printf("---- CACHE CONTENT ----\n");
+            print_cache();
+            printf("-----------------------\n");
+            continue;
+        }
 
         double t0 = current_time_ns();
 
@@ -62,6 +74,7 @@ int main() {
     }
 
     save_cache();
+    printf("Final cache state:\n");
     print_cache();
 
     return 0;
