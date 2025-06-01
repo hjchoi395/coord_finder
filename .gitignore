@@ -1,5 +1,6 @@
 coord_finder
 cache_state.db
+counter_state.db
 *.o
 *.exe
 .vscode/
