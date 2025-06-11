@@ -1,4 +1,4 @@
-    #include "counter.h"
+#include "counter.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
