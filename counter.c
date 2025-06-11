@@ -32,7 +32,7 @@ void counter_increment(const char *key) {
 void counter_print_all(void) {
     printf("=== Call Count History ===\n");
     for (CounterEntry *cur = counter_head; cur; cur = cur->next) {
-        printf("  \"%s\" -> %d회\n", cur->key, cur->count);
+        printf("  \"%s\" -> %dtimes\n", cur->key, cur->count);
     }
     printf("==========================\n");
 }
