@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <stdbool.h>
 
 #ifdef _WIN32
   #define WIN32_LEAN_AND_MEAN
@@ -15,8 +16,7 @@
 #include "counter.h"
 
 // 고해상도 시간 측정 함수 (나노초 단위)
-// ※ double 대신 int64_t 기반으로 추출해 정밀도 보강 가능
-static double current_time_ns() {
+static double current_time_ns(void) {
 #ifdef _WIN32
     static LARGE_INTEGER freq = {0};
     if (freq.QuadPart == 0) {
@@ -32,7 +32,7 @@ static double current_time_ns() {
 #endif
 }
 
-int main() {
+int main(void) {
     char input[64], value[128];
 
     // 1) 캐시 초기화 및 로드
@@ -44,19 +44,18 @@ int main() {
     load_counter();
 
     while (1) {
-        printf("\n>> Enter command (coordinate lookup: enter key / cache: view cache / "
-            "counter: view call history / exit: quit): ");
+        printf("\n>> Enter command (lookup key / cache / counter / exit): ");
         if (scanf("%63s", input) != 1) {
-            // 입력이 더 이상 없으면 종료
+            // 입력 실패 시 종료
             break;
         }
 
-        // 종료
+        // exit
         if (strcmp(input, "exit") == 0) {
             break;
         }
 
-        // 캐시 내용 출력
+        // cache 보기
         if (strcmp(input, "cache") == 0) {
             printf("\n---- CACHE CONTENT ----\n");
             print_cache();
@@ -64,7 +63,7 @@ int main() {
             continue;
         }
 
-        // 카운터(호출 기록) 내용 출력
+        // counter 보기
         if (strcmp(input, "counter") == 0) {
             printf("\n---- CALL COUNT HISTORY ----\n");
             counter_print_all();
@@ -72,37 +71,44 @@ int main() {
             continue;
         }
 
-        // 그 외의 입력은 “좌표 조회” 로 간주
-        // (1) 카운트 집계
-        counter_increment(input);
-
-        // (2) 조회 시간 측정
+        // 그 외엔 좌표 조회
         double t0 = current_time_ns();
+        bool found = false;
 
+        // 1) 캐시 조회
         if (cache_lookup(input, value)) {
+            found = true;
             double t1 = current_time_ns();
             printf("CACHE HIT : \"%s\" -> \"%s\" (%.0f ns)\n",
                    input, value, t1 - t0);
-        } else {
-            if (db_lookup(input, value)) {
-                cache_insert(input, value);
-                double t1 = current_time_ns();
-                printf("CACHE MISS: Load from DB -> \"%s\" (%.0f ns)\n",
-                       value, t1 - t0);
-            } else {
-                double t1 = current_time_ns();
-                printf("NOT FOUND  : \"%s\" (%.0f ns)\n",
-                       input, t1 - t0);
-            }
+        }
+        // 2) 캐시 미스 → DB 조회
+        else if (db_lookup(input, value)) {
+            found = true;
+            cache_insert(input, value);
+            double t1 = current_time_ns();
+            printf("CACHE MISS: Load from DB -> \"%s\" (%.0f ns)\n",
+                   value, t1 - t0);
+        }
+        // 3) 미발견
+        else {
+            double t1 = current_time_ns();
+            printf("NOT FOUND  : \"%s\" (%.0f ns)\n",
+                   input, t1 - t0);
+        }
+
+        // 조회 성공한 키만 카운터 집계
+        if (found) {
+            counter_increment(input);
         }
     }
 
-    // 프로그램 종료 직전: 캐시 저장 → 캐시 내용 출력
+    // 종료 직전: 캐시 저장 및 출력
     save_cache();
     printf("\nFinal cache state:\n");
     print_cache();
 
-    // 카운터 저장 → 호출 기록 출력 → 메모리 해제
+    // 카운터 저장, 출력, 메모리 해제
     save_counter();
     printf("\nFinal call counts:\n");
     counter_print_all();
