@@ -72,19 +72,19 @@ int main(void) {
         }
 
         // 그 외엔 좌표 조회
+        // 조회 시도마다 카운터를 증가시킨다 (hit/miss 모두 포함)
+        counter_increment(input);
+
         double t0 = current_time_ns();
-        bool found = false;
 
         // 1) 캐시 조회
         if (cache_lookup(input, value)) {
-            found = true;
             double t1 = current_time_ns();
             printf("CACHE HIT : \"%s\" -> \"%s\" (%.0f ns)\n",
                    input, value, t1 - t0);
         }
         // 2) 캐시 미스 → DB 조회
         else if (db_lookup(input, value)) {
-            found = true;
             cache_insert(input, value);
             double t1 = current_time_ns();
             printf("CACHE MISS: Load from DB -> \"%s\" (%.0f ns)\n",
@@ -97,10 +97,7 @@ int main(void) {
                    input, t1 - t0);
         }
 
-        // 조회 성공한 키만 카운터 집계
-        if (found) {
-            counter_increment(input);
-        }
+        // 위 출력 이후 다음 루프 진행
     }
 
     // 종료 직전: 캐시 저장 및 출력
