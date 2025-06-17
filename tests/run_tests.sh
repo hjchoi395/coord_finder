@@ -7,36 +7,54 @@ gcc -std=c11 -D_POSIX_C_SOURCE=200809L -O2 -o coord_finder main.c cache.c db.c c
 # start from a clean state
 rm -f cache_state.db counter_state.db out.txt
 
-# pre-populate cache with a valid entry for hq1 and an expired entry for TTL test
-now=$(date +%s)
-printf '%s hq1 37.618367 127.496473\n0 oldkey oldvalue\n' "$now" > cache_state.db
+# pre-populate cache with only an expired entry for TTL test
+printf '0 oldkey oldvalue\n' > cache_state.db
 
-# run about 50 lookups: 25 hits (hq1) and 25 misses (badkey)
+# run lookups: hq1~hq10, cp1~cp10, point10001~point10030 twice each
+keys=""
+for i in $(seq 1 10); do
+    keys="$keys hq$i"
+done
+for i in $(seq 1 10); do
+    keys="$keys cp$i"
+done
+for i in $(seq 10001 10030); do
+    keys="$keys point$i"
+done
+
 {
-    for i in $(seq 1 25); do
-        echo hq1
+    for k in $keys; do
+        echo "$k"
     done
-    for i in $(seq 1 25); do
-        echo badkey
+    for k in $keys; do
+        echo "$k"
     done
     echo exit
 } | ./coord_finder > out.txt
 
 # compute average times in nanoseconds
-hit_avg=$(grep 'CACHE HIT' out.txt | sed 's/.*(\([0-9]*\) ns).*/\1/' | awk '{sum+=$1} END {if (NR>0) printf "%.0f", sum/NR; else print 0}')
-miss_avg=$(grep -E 'CACHE MISS|NOT FOUND' out.txt | sed 's/.*(\([0-9]*\) ns).*/\1/' | awk '{sum+=$1} END {if (NR>0) printf "%.0f", sum/NR; else print 0}')
+times=$(grep -o '[0-9]\+ ns' out.txt | awk '{print $1}')
+miss_avg=$(echo "$times" | head -n 50 | awk '{sum+=$1} END {if (NR>0) printf "%.0f", sum/NR; else print 0}')
+hit_avg=$(echo "$times" | tail -n 50 | awk '{sum+=$1} END {if (NR>0) printf "%.0f", sum/NR; else print 0}')
 
 printf 'Average hit time: %s ns\n' "$hit_avg"
 printf 'Average miss time: %s ns\n' "$miss_avg"
 
-# verify counter increments
-hq1_count=$(grep '^hq1 ' counter_state.db | awk '{print $2}')
-bad_count=$(grep '^badkey ' counter_state.db | awk '{print $2}')
+# verify counter increments - each key should have count=2
+fail=0
+for k in $keys; do
+    cnt=$(grep "^$k " counter_state.db | awk '{print $2}')
+    if [ "$cnt" != "2" ]; then
+        echo "Counter mismatch for $k: $cnt"
+        fail=1
+        break
+    fi
+done
 
-if [ "$hq1_count" = "25" ] && [ "$bad_count" = "25" ]; then
+if [ $fail -eq 0 ]; then
   echo "Counter increments test: PASS"
 else
-  echo "Counter increments test: FAIL (hq1=$hq1_count badkey=$bad_count)"
+  echo "Counter increments test: FAIL"
   exit 1
 fi
 
